@@ -16,7 +16,7 @@ theme:
   name: material
   custom_dir: docs/mkdocs/overrides
   logo: assets/logo.png
-  favicon: assets/logo.png
+  favicon: assets/favicon.png
   icon:
     repo: fontawesome/brands/github
   features:
