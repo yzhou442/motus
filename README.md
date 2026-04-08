@@ -21,7 +21,7 @@
 
 <p align="center">
   <a href="https://www.lithosai.com/">LithosAI</a> &middot;
-  <a href="http://console.lithosai.com/">Cloud</a> &middot;
+  <a href="http://console.lithosai.cloud/">Cloud</a> &middot;
   <a href="https://motus.readthedocs.io/">Docs</a> &middot;
   <a href="https://motus.readthedocs.io/getting-started/quickstart/">Quickstart</a> &middot;
   <a href="https://motus.readthedocs.io/examples/">Examples</a> &middot;
