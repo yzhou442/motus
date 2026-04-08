@@ -2,7 +2,11 @@
 
 <!-- TODO: commit logo to assets/ and replace with repo-relative or raw.githubusercontent path -->
 <p align="center">
-  <img alt="Motus" src="assets/motus.png" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/motus-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="assets/motus.png" />
+    <img alt="Motus" src="assets/motus.png" />
+  </picture>
 </p>
 
 <p align="center">
