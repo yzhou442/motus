@@ -175,11 +175,11 @@ Learn more from our [comprehensive examples](examples/).
 
 | | |
 |---|---|
-| **[Agents](docs/user-guide/agents.md)** | `ReActAgent` runs the reasoning loop, tool dispatch, and conversation state. Multi-turn memory, structured output via Pydantic, and input/output guardrails — all built in. A working agent in under 10 lines. |
-| **[Tools](docs/user-guide/tools.md)** | Write a function, get a tool. Expose class methods with `@tools`, wrap an MCP server with `get_mcp()`, nest another agent with `as_tool()`, or run untrusted code in a Docker sandbox — everything composes through the same `tools=[...]` interface. Built-in utilities: skills, `bash`, file ops, `glob` / `grep`, todo tracking. |
-| **[Task-graph runtime](docs/user-guide/runtime.md)** | `@agent_task` turns any function into a node in a dependency graph — automatic parallel execution, multi-return futures, non-blocking operators. Retries, timeouts, and backoff are declarative on the task and overridable per call site with `.policy()`. |
+| **[Agents](docs/user-guide/agents.md)** | `ReActAgent` runs the reasoning loop, tool dispatch, and conversation state. Multi-turn memory, structured output via Pydantic, and input/output guardrails. All built in. A working agent in under 10 lines. |
+| **[Tools](docs/user-guide/tools.md)** | Write a function, get a tool. Expose class methods with `@tools`, wrap an MCP server with `get_mcp()`, nest another agent with `as_tool()`, or run untrusted code in a Docker sandbox. Everything composes through the same `tools=[...]` interface. Built-in utilities: skills, `bash`, file ops, `glob` / `grep`, todo tracking. |
+| **[Task-graph runtime](docs/user-guide/runtime.md)** | `@agent_task` turns any function into a node in a dependency graph with automatic parallel execution, multi-return futures, non-blocking operators. Retries, timeouts, and backoff are declarative on the task and overridable per call site with `.policy()`. |
 | **[Multi-provider models](docs/user-guide/models.md)** | Unified client for OpenAI, Anthropic, Gemini, and OpenRouter. Switch providers by changing one line — agent logic stays the same. Local models (Ollama, vLLM) work through `base_url`. |
-| **[Tracing & debugging](docs/user-guide/tracing.md)** | Every LLM call, tool invocation, and task dependency traced automatically. Interactive HTML viewer, Jaeger export, or cloud dashboard — enabled with one env var. |
+| **[Tracing & debugging](docs/user-guide/tracing.md)** | Every LLM call, tool invocation, and task dependency traced automatically. Interactive HTML viewer, Jaeger export, or cloud dashboard. Enabled with one env var. |
 | **[Local serving](docs/user-guide/serving.md)** | `motus serve` exposes any agent as a session-based HTTP API locally. Test the full serving stack before deploying to the cloud. |
 
 #### Go deeper
@@ -189,11 +189,11 @@ Learn more from our [comprehensive examples](examples/).
 | **[Memory](docs/user-guide/memory.md)** | Provided memory solutions: `basic` (append-only), `compact` (auto-summarizes when token budget runs thin). Session save/restore built in. |
 | **[Guardrails](docs/user-guide/guardrails.md)** | Input and output validation on both agents and individual tools. Declare the parameters you care about — return a dict to modify, raise to block. Structured output guardrails match fields on Pydantic models. |
 | **[Multi-agent composition](docs/user-guide/agents.md)** | `agent.as_tool()` wraps any agent as a tool. The supervisor doesn't know whether it's calling a function or another agent — the interface is identical. `fork()` creates independent conversation branches. |
-| **[MCP integration](docs/user-guide/mcp-integration.md)** | Connect any MCP-compatible server with `get_mcp()` — local via stdio, remote via HTTP, or inside a Docker container. Filter and rename tools with `prefix`, `blocklist`, and guardrails. |
+| **[MCP integration](docs/user-guide/mcp-integration.md)** | Connect any MCP-compatible server with `get_mcp()`. Local via stdio, remote via HTTP, or inside a Docker container. Filter and rename tools with `prefix`, `blocklist`, and guardrails. |
 | **[Docker sandboxes](docs/user-guide/tools.md)** | Run untrusted code in isolated containers. Mount volumes, expose ports, execute shell and Python — attach to any agent as a tool provider. |
 | **[Prompt caching](docs/user-guide/models.md)** | Prompt caching via `CachePolicy` — `STATIC` (system + tools) or `AUTO` (+ conversation prefix). Reduce latency and cost on long conversations. |
-| **SDK compatibility** | Drop-in for [OpenAI Agents SDK](docs/integrations/openai-agents.md), [Anthropic SDK](docs/integrations/claude-agent.md), and Google ADK. Change the import, keep your code — get tracing and cloud deployment for free. |
-| **Human-in-the-loop** | Built-in support for interactive approval, clarification, and feedback during agent execution. Pause the agent, ask for human input, and resume — works in both local serving and cloud deployment. |
+| **SDK compatibility** | Drop-in for [OpenAI Agents SDK](docs/integrations/openai-agents.md), [Anthropic SDK](docs/integrations/claude-agent.md), and Google ADK. Change the import, keep your code. |
+| **Human-in-the-loop** | Built-in support for interactive approval, clarification, and feedback during agent execution. Pause the agent, ask for human input, and resume. Works in both local serving and cloud deployment. |
 | **[Lifecycle hooks](docs/user-guide/tracing.md)** | Three-level hook system (global, per-task name, per-task type). Tap into `task_start`, `task_end`, `task_error` for logging, metrics, or custom logic. |
 
 ---
