@@ -15,8 +15,10 @@ Before you install Motus, make sure you have:
 
 <CodeGroup>
 
-```bash uv
-uv add lithosai-motus
+```bash uv (from source)
+git clone https://github.com/lithosai/motus.git
+cd motus
+uv sync
 ```
 
 ```bash pip
@@ -33,30 +35,23 @@ Install optional extras to use Motus alongside other agent frameworks:
 
 <Tabs>
   <Tab title="OpenAI Agents SDK">
-    ```bash uv
-    uv add "lithosai-motus[openai-agents]"
+    ```bash
+    uv sync --extra openai-agents
     ```
-
-    ```bash pip
-    pip install "lithosai-motus[openai-agents]"
+  </Tab>
+  <Tab title="Claude Agent SDK">
+    ```bash
+    uv sync --extra claude-agent-sdk
     ```
   </Tab>
   <Tab title="Google ADK">
-    ```bash uv
-    uv add "lithosai-motus[google-adk]"
-    ```
-
-    ```bash pip
-    pip install "lithosai-motus[google-adk]"
+    ```bash
+    uv sync --extra google-adk
     ```
   </Tab>
   <Tab title="All extras">
-    ```bash uv
-    uv add "lithosai-motus[openai-agents,google-adk]"
-    ```
-
-    ```bash pip
-    pip install "lithosai-motus[openai-agents,google-adk]"
+    ```bash
+    uv sync --all-extras
     ```
   </Tab>
 </Tabs>
