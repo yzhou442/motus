@@ -138,6 +138,45 @@ async def io_bound(url):
 
 Sync tasks run in the runtime's `ThreadPoolExecutor`. Async tasks run directly on the runtime event loop. Prefer async for I/O-bound work and sync for CPU-bound work.
 
+## Class methods
+
+`@agent_task` implements the descriptor protocol, so it works on class methods:
+
+```python
+class DataProcessor:
+    def __init__(self, multiplier):
+        self.multiplier = multiplier
+
+    @agent_task
+    def process(self, value):
+        return value * self.multiplier
+
+proc = DataProcessor(3)
+result = proc.process(10)  # AgentFuture — resolves to 30
+```
+
+When accessed through an instance, `@agent_task` binds `self` automatically, matching the behavior of regular Python methods.
+
+## Per-task hooks
+
+You can attach hooks directly in the decorator:
+
+```python
+def log_start(event):
+    print(f"Starting {event.name}")
+
+def log_end(event):
+    print(f"Finished {event.name}: {event.result}")
+
+@agent_task(on_start=log_start, on_end=log_end)
+def important_task(data):
+    return transform(data)
+```
+
+<Note>
+These hooks fire only for this specific task. For broader hook patterns, see [Tracing](/guides/tracing).
+</Note>
+
 ## Lifecycle
 
 ```python

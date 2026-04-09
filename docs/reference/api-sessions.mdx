@@ -3,6 +3,41 @@ title: "Sessions"
 description: "REST API reference for session management. Sessions represent individual conversations with your agent — each one holds its own state and message history."
 ---
 
+## GET /health
+
+Server health check.
+
+### Response
+
+**`200 OK`** — returns a `HealthResponse`.
+
+```json
+{
+  "status": "ok",
+  "max_workers": 4,
+  "running_workers": 2,
+  "total_sessions": 2
+}
+```
+
+<ResponseField name="status" type="string" required>
+  Server status. Always `"ok"` when the server is reachable.
+</ResponseField>
+
+<ResponseField name="max_workers" type="number" required>
+  Maximum number of concurrent worker processes configured on the server.
+</ResponseField>
+
+<ResponseField name="running_workers" type="number" required>
+  Number of worker processes currently executing agent turns.
+</ResponseField>
+
+<ResponseField name="total_sessions" type="number" required>
+  Total number of sessions currently held in memory.
+</ResponseField>
+
+---
+
 A session is created before you send any messages. The server keeps all sessions in memory; they do not persist across server restarts. When `--ttl` is configured on the server, idle and errored sessions are automatically swept after the TTL period elapses.
 
 ### Session status

@@ -173,6 +173,18 @@ async def query(query: str) -> str:
 
 Guardrails run sequentially — each one sees the previous one's output. Both sync and async functions are supported. Class-level guardrails apply to all methods unless a per-method `@tool` overrides them.
 
+For agent output guardrails with `response_format`, the same convention applies — declare only the fields you care about:
+
+```python
+from motus.guardrails import OutputGuardrailTripped
+
+def validate_score(score: float):
+    if not 0 <= score <= 1:
+        raise OutputGuardrailTripped("Score must be 0-1")
+
+agent = ReActAgent(..., response_format=MyModel, output_guardrails=[validate_score])
+```
+
 ## Builtin tools
 
 Motus ships a set of code-agent tools for filesystem access and shell execution:

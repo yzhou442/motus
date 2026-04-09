@@ -268,3 +268,23 @@ motus serve send http://localhost:8000 550e8400-e29b-41d4-a716-446655440000 "hel
   --webhook-url https://example.com/hook \
   --webhook-token secret
 ```
+
+---
+
+## Plugin system
+
+CLI commands are registered dynamically through a plugin interface. Each module that provides commands implements a `register_cli(subparsers)` function. At startup, motus discovers registered plugins and calls `register_cli` to add their subcommands to the argument parser.
+
+To add a custom command group, create a module with:
+
+```python
+def register_cli(subparsers):
+    parser = subparsers.add_parser("mycommand", help="My custom command")
+    parser.add_argument("name")
+    parser.set_defaults(func=run_mycommand)
+
+def run_mycommand(args):
+    print(f"Running with {args.name}")
+```
+
+Then register the module as a motus CLI plugin in your package metadata.
