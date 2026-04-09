@@ -50,6 +50,35 @@ Other auth commands:
   </Step>
 </Steps>
 
+## How it works
+
+A deployment proceeds through these stages:
+
+<Steps>
+  <Step title="Validate">
+    Validate the import path (`module:variable` format) by importing it locally.
+  </Step>
+  <Step title="Resolve project">
+    Look up an existing project by `--project-id`, or create one with `--name`.
+  </Step>
+  <Step title="Create build">
+    Create a build via the cloud API with the project ID, import path, optional Git source, and optional secrets.
+  </Step>
+  <Step title="Persist configuration">
+    Persist `project_id`, `build_id`, and `import_path` to `motus.toml` so subsequent deploys can reuse them. (`git_url` and `git_ref` are also saved when provided.)
+  </Step>
+  <Step title="Upload source code">
+    Collect project files, pack them into a `.tar.zst` archive, and upload via a presigned URL. Git deploys skip this step — the build service pulls the repository directly.
+  </Step>
+  <Step title="Stream build status">
+    Stream build status via SSE. The build progresses through:
+
+    `queued` → `building` → `built` → `deploying` → `deployed`
+
+    After deployment, health checks continue in the background until the build transitions to `healthy` (or `failed`).
+  </Step>
+</Steps>
+
 ## Deploy from Git
 
 Instead of uploading local files, you can build directly from a Git repository:

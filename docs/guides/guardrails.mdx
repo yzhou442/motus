@@ -115,6 +115,10 @@ async def post_comment(text: str) -> str:
 
 When you pass multiple guardrails they form a sequential pipeline — each guardrail sees the output of the previous one. Input `"  Hello   WORLD  "` flows through: normalize → lowercase → profanity check. The tool receives `"hello world"`.
 
+<Note>
+  Agent-level guardrails also support `parallel=True` mode, where all guardrails run concurrently on the original value. Modifications are discarded — only tripwire exceptions take effect.
+</Note>
+
 ## Structured output guardrails
 
 When the agent uses `response_format` with a Pydantic `BaseModel`, output guardrails use field matching — declare only the fields you need to inspect:

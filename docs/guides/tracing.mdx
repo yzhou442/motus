@@ -92,6 +92,20 @@ Execution order within each event: global hooks, then name hooks, then type hook
 | `task_id` | `AgentTaskId` | Unique identifier for this task instance |
 | `metadata` | `dict` | Additional context, such as `parent_stack` |
 
+## Programmatic access
+
+```python
+from motus.runtime import get_runtime
+
+tracer = get_runtime().scheduler.tracer  # auto-inits runtime if needed
+
+tracer.export_trace()
+tracer.get_trace_id()           # UUID for this session
+
+for task_id, meta in tracer.task_meta.items():
+    print(f"{meta['func']}: {meta.get('ended_at', 'running')}")
+```
+
 ## Advanced configuration
 
 For fine-grained control, construct a `TraceConfig` directly instead of relying on environment variables:
@@ -114,6 +128,8 @@ config = TraceConfig(
 | `online_tracing` | `bool` | from env | Start a local SSE viewer |
 | `log_dir` | `Path` | `traces/trace_<ts>/` | Output directory |
 | `json_path` | `str` | `"tracer_state.json"` | JSON state filename |
+| `cloud_api_url` | `str \| None` | from credentials | Cloud API endpoint |
+| `cloud_api_key` | `str \| None` | from credentials | Cloud API key |
 | `project` | `str \| None` | `MOTUS_PROJECT` / `motus.toml` | Project tag for cloud traces |
 | `build` | `str \| None` | `MOTUS_BUILD` / `motus.toml` | Build tag for cloud traces |
 

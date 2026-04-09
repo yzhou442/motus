@@ -34,6 +34,13 @@ motus serve chat http://localhost:8000
 
 Every agent type follows the same turn contract: receive a `ChatMessage` and the session's prior state, return a response `ChatMessage` and updated state. All agent types run in worker subprocesses and must be importable from the module level.
 
+| Parameter | Type | Description |
+|---|---|---|
+| `message` | `ChatMessage` | The new user message (constructed by the server from the HTTP request). |
+| `state` | `list[ChatMessage]` | The session's state from the previous turn (empty list on first turn). |
+
+**Return value**: `tuple[ChatMessage, list[ChatMessage]]` — the response message (surfaced to the HTTP client) and the updated state (stored in the session). The agent owns the state and can append, compact, or restructure it freely.
+
 <Tabs>
   <Tab title="ServableAgent">
     Any object with a conforming `run_turn` method can be served directly. This is a runtime-checkable `Protocol` — inheritance is not required.
