@@ -117,7 +117,7 @@ class AgentServer:
 
         app = FastAPI(
             title="Motus Agent Server",
-            version="1.2.2",
+            version="0.1.0",
             lifespan=lifespan,
         )
 

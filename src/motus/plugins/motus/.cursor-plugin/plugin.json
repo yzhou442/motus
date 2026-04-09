@@ -1,7 +1,7 @@
 {
   "name": "motus",
   "displayName": "Motus",
-  "version": "1.2.2",
+  "version": "0.1.0",
   "description": "Build, configure, and deploy AI agents using the Motus framework. The single /motus plugin includes guided agent creation and local or cloud deployment.",
   "author": {
     "name": "LithosAI",
