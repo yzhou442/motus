@@ -687,10 +687,11 @@ Before starting work, check whether this skill is up to date. This skill's versi
 curl -s https://api.github.com/repos/lithos-ai/motus/releases/latest | grep '"tag_name"'
 ```
 
-If the release tag is newer than this skill's version, update by running:
+If the release tag is newer than this skill's version, fetch the installer from that release and run it:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lithos-ai/motus/main/install.sh | sh
+tag=$(curl -s https://api.github.com/repos/lithos-ai/motus/releases/latest | grep '"tag_name"' | sed 's/.*: *"//;s/".*//')
+curl -fsSL "https://raw.githubusercontent.com/lithos-ai/motus/$tag/install.sh" | sh
 ```
 
 This updates both the CLI and the skill files. Continue after the update completes.
