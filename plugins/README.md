@@ -13,35 +13,44 @@
 
 ### Source of truth
 
-Plugin files live at `src/motus/plugins/motus/` inside the Python package. They are bundled as `package-data` and installed to site-packages by `uv tool install`. The `plugins/motus` entry at the repo root is a **symlink** into the package source, so that GitHub-based marketplace discovery (Claude Code, Codex) can find the plugin using the relative path `./plugins/motus`.
+Plugin files live at `src/motus/plugins/motus/` inside the Python package. They are bundled as `package-data` and installed to site-packages by `uv tool install`.
 
 ### Repo layout
 
 ```
-src/motus/plugins/motus/          <-- actual files (package data)
-    .claude-plugin/plugin.json
-    .codex-plugin/plugin.json
-    .cursor-plugin/plugin.json
-    skills/motus/SKILL.md ...
+src/motus/plugins/                    <-- package data
+    motus/                            <-- the actual plugin
+        .claude-plugin/plugin.json
+        .codex-plugin/plugin.json
+        .cursor-plugin/plugin.json
+        skills/motus/
+            SKILL.md
+            REFERENCE.md, PATTERNS.md, EXAMPLES.md, ...
+            gemini-extension.json     <-- Gemini manifest listing all context files
 
-plugins/motus                     <-- symlink -> ../src/motus/plugins/motus
+plugins/motus                         <-- symlink -> ../src/motus/plugins/motus
 
-.claude-plugin/marketplace.json   <-- repo-root marketplace (source: "./plugins/motus")
-.agents/plugins/marketplace.json  <-- repo-root marketplace (source: "./plugins/motus")
+.agents/plugins/marketplace.json      <-- Codex marketplace (source: "./.agents/plugins/motus")
+.agents/plugins/motus                 <-- symlink -> ../../src/motus/plugins/motus
+.claude-plugin/marketplace.json       <-- Claude Code marketplace (source: "./plugins/motus")
 ```
 
-Both marketplace files use `"name": "LithosAI"` so that local and GitHub-based registrations overwrite rather than duplicate each other.
+All marketplace files use `"name": "LithosAI"` so that local and GitHub-based registrations overwrite rather than duplicate each other.
 
-### Per-agent deployment (`motus setup`)
+### Per-agent deployment (`install.sh`)
 
-| Agent | Deployment method | Location |
-|-------|-------------------|----------|
-| Claude Code | `claude plugin marketplace add` from GitHub | `~/.claude/plugins/` (managed by Claude Code) |
-| Codex | Personal marketplace pointing to package path | `~/.agents/plugins/marketplace.json` |
-| Cursor | Symlink to package path | `~/.cursor/skills/motus` |
-| Gemini | Symlink to package path | `~/.gemini/skills/motus` |
+| Agent | Deployment method | Installed location |
+|-------|-------------------|--------------------|
+| Claude Code | `claude plugin marketplace add` from GitHub | `~/.claude/plugins/` (managed by Claude Code, auto-updates) |
+| Codex | Symlink skill directory | `~/.codex/skills/motus` → package skill path |
+| Cursor | Symlink skill directory | `~/.cursor/skills/motus` → package skill path |
+| Gemini | Symlink skill directory as extension | `~/.gemini/extensions/motus` → package skill path |
 
-Claude Code gets its own managed copy via the GitHub marketplace with auto-update enabled. The other three agents point (via marketplace entry or symlink) to files inside the uv-managed package at `~/.local/share/uv/tools/lithosai-motus/.../site-packages/motus/plugins/motus/`.
+Claude Code gets its own managed copy via the GitHub marketplace with auto-update enabled. The other three agents get symlinks to the skill directory inside the uv-managed package. Full plugin installs (marketplace or plugin directory) are not used for Codex, Cursor, or Gemini because a plugin containing a skill with the same name causes duplicate registration.
+
+Gemini CLI uses `gemini-extension.json` to discover context files (it does not read `SKILL.md` by default). The manifest lists all markdown files in the skill directory.
+
+The repo-root marketplace files and plugin manifests (`.codex-plugin/`, `.cursor-plugin/`) remain for GitHub-based discovery when agents browse the repo directly.
 
 ### Update matrix
 
@@ -49,7 +58,7 @@ Claude Code gets its own managed copy via the GitHub marketplace with auto-updat
 |-----------|------------------|-----------|
 | CLI | `uv tool upgrade lithosai-motus` | Manual (prompted by version check) |
 | Claude Code plugin | Auto-update from GitHub | Automatic |
-| Codex/Cursor/Gemini plugin | `uv tool upgrade` (same paths) | With CLI upgrade |
+| Codex/Cursor/Gemini skill | `uv tool upgrade` (symlinks, same paths) | With CLI upgrade |
 
 The CLI checks PyPI once every 24 hours and prints a message to stderr when a new version is available. SKILL.md instructs the coding agent to run the upgrade command when it sees this message, so updates happen organically during coding sessions.
 
@@ -61,3 +70,6 @@ When releasing a new version, update these files:
 2. `src/motus/plugins/motus/.claude-plugin/plugin.json` (`"version": "X.Y.Z"`)
 3. `src/motus/plugins/motus/.codex-plugin/plugin.json` (`"version": "X.Y.Z"`)
 4. `src/motus/plugins/motus/.cursor-plugin/plugin.json` (`"version": "X.Y.Z"`)
+5. `src/motus/plugins/motus/skills/motus/gemini-extension.json` (`"version": "X.Y.Z"`)
+6. `.claude-plugin/marketplace.json` (`metadata.version` — marketplace version, independent of plugin)
+7. `.cursor-plugin/marketplace.json` (`metadata.version` — marketplace version, independent of plugin)

@@ -8,7 +8,7 @@
       "name": "motus",
       "source": {
         "source": "local",
-        "path": "./plugins/motus"
+        "path": "./.agents/plugins/motus"
       },
       "policy": {
         "installation": "AVAILABLE",
