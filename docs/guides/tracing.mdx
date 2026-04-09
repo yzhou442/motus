@@ -1,9 +1,9 @@
 ---
 title: "Tracing"
-description: "Automatically record every LLM call and tool invocation as a structured span — no manual instrumentation required."
+description: "Automatically record every LLM call and tool invocation as a structured span no manual instrumentation required."
 ---
 
-Every `@agent_task` — LLM calls, tool invocations, and task dependencies — is recorded as a span automatically. No manual instrumentation required. Traces capture timing, inputs, outputs, and parent relationships so you can understand exactly what your agent did and why.
+Every `@agent_task` LLM calls, tool invocations, and task dependencies is recorded as a span automatically. No manual instrumentation required. Traces capture timing, inputs, outputs, and parent relationships so you can understand exactly what your agent did and why.
 
 <Tip>
   Run `MOTUS_TRACING=1 python my_agent.py` to enable detailed tracing with file export in a single environment variable.
@@ -12,21 +12,21 @@ Every `@agent_task` — LLM calls, tool invocations, and task dependencies — i
 ## Collection levels
 
 | Level | Captures | Overhead |
-|-------|----------|----------|
+| --- | --- | --- |
 | `disabled` | Nothing | None |
 | `basic` (default) | Task names, timing, parent relationships | Minimal |
-| `detailed` | + full messages, tool arguments, model outputs | Higher |
+| `detailed` | \+ full messages, tool arguments, model outputs | Higher |
 
-`MOTUS_TRACING=1` sets collection to `detailed` and enables file export. The `basic` level is always on by default — it adds negligible overhead and gives you timing data for every run.
+`MOTUS_TRACING=1` sets collection to `detailed` and enables file export. The `basic` level is always on by default it adds negligible overhead and gives you timing data for every run.
 
 ## Environment variables
 
 | Variable | Purpose | Default |
-|----------|---------|---------|
-| `MOTUS_TRACING` | `1` enables `detailed` collection + file export | off |
+| --- | --- | --- |
+| `MOTUS_TRACING` | `1` enables `detailed` collection \+ file export | off |
 | `MOTUS_COLLECTION_LEVEL` | Explicit level: `disabled`, `basic`, or `detailed`. Overrides the level set by `MOTUS_TRACING` but not its export behavior. | `basic` |
 | `MOTUS_TRACING_EXPORT` | `1` enables file export only (without changing the collection level) | off |
-| `MOTUS_TRACING_ONLINE` | `1` enables detailed collection + file export + live SSE viewer | off |
+| `MOTUS_TRACING_ONLINE` | `1` enables detailed collection \+ file export \+ live SSE viewer | off |
 | `MOTUS_TRACING_DIR` | Custom output directory | `traces/trace_<timestamp>/` |
 
 ## Export formats
@@ -34,7 +34,7 @@ Every `@agent_task` — LLM calls, tool invocations, and task dependencies — i
 After a run, `TraceManager.export_trace()` writes the following files to the output directory:
 
 | File | Description |
-|------|-------------|
+| --- | --- |
 | `tracer_state.json` | Raw span metadata — timing, parent relationships, and extracted fields |
 | `trace_viewer.html` | Interactive span tree with timing bars and search. Opens automatically on exit when `MOTUS_TRACING=1`. |
 | `jaeger_traces.json` | OpenTelemetry-format spans for Jaeger, Zipkin, or any OTLP backend |
@@ -81,7 +81,7 @@ Execution order within each event: global hooks, then name hooks, then type hook
 ### HookEvent fields
 
 | Field | Type | Description |
-|-------|------|-------------|
+| --- | --- | --- |
 | `event_type` | `str` | `"task_start"`, `"task_end"`, `"task_error"`, or `"task_cancelled"` |
 | `name` | `str` | Function or tool name |
 | `task_type` | `str` | `"normal_task"`, `"tool_call"`, `"model_call"`, `"agent_call"`, or `"magic_task"` |
@@ -122,18 +122,18 @@ config = TraceConfig(
 ```
 
 | Field | Type | Default | Description |
-|-------|------|---------|-------------|
+| --- | --- | --- | --- |
 | `collection_level` | `CollectionLevel` | from env | What data to collect |
 | `export_enabled` | `bool` | from env | Write trace files on export |
 | `online_tracing` | `bool` | from env | Start a local SSE viewer |
 | `log_dir` | `Path` | `traces/trace_<ts>/` | Output directory |
 | `json_path` | `str` | `"tracer_state.json"` | JSON state filename |
-| `cloud_api_url` | `str \| None` | from credentials | Cloud API endpoint |
-| `cloud_api_key` | `str \| None` | from credentials | Cloud API key |
-| `project` | `str \| None` | `MOTUS_PROJECT` / `motus.toml` | Project tag for cloud traces |
-| `build` | `str \| None` | `MOTUS_BUILD` / `motus.toml` | Build tag for cloud traces |
+| `cloud_api_url` | `str | None` | from credentials | Cloud API endpoint |
+| `cloud_api_key` | `str | None` | from credentials | Cloud API key |
+| `project` | `str | None` | `MOTUS_PROJECT` / `motus.toml` | Project tag for cloud traces |
+| `build` | `str | None` | `MOTUS_BUILD` / `motus.toml` | Build tag for cloud traces |
 
-## Cloud tracing
+## Self-managed Agent tracing
 
 With a Motus Cloud account, spans stream to the Motus dashboard in real time. Authenticate with:
 
@@ -152,3 +152,5 @@ Tag traces with project and build identifiers for easier filtering in the dashbo
 ```bash
 MOTUS_PROJECT=my-project MOTUS_BUILD=v1.2.3 python my_agent.py
 ```
+
+## Cloud Tracing
