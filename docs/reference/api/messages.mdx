@@ -4,12 +4,12 @@ description: "REST API reference for sending messages to a session and retrievin
 ---
 
 <Note>
-  Sending a message is asynchronous. `POST /sessions/{id}/messages` returns `202 Accepted` immediately — the agent runs in the background. To get the result, either poll `GET /sessions/{id}` (with optional long-polling via `wait=true`) or include a `webhook` field in your request to receive a callback when the turn completes. See [Webhooks](/reference/api-webhooks) for details.
+  Sending a message is asynchronous. `POST /sessions/\{id}/messages` returns `202 Accepted` immediately — the agent runs in the background. To get the result, either poll `GET /sessions/\{id}` (with optional long-polling via `wait=true`) or include a `webhook` field in your request to receive a callback when the turn completes. See [Webhooks](/reference/api/webhooks) for details.
 </Note>
 
 ---
 
-## POST /sessions/{session_id}/messages
+## POST /sessions/\{session_id}/messages
 
 Send a message to a session. The agent processes it in the background and the endpoint returns immediately.
 
@@ -34,7 +34,7 @@ Send a message to a session. The agent processes it in the background and the en
 </ParamField>
 
 <ParamField body="webhook" type="WebhookSpec | null" default="null">
-  Webhook configuration to receive the turn result via HTTP callback instead of polling. See [Webhooks](/reference/api-webhooks) for the full spec.
+  Webhook configuration to receive the turn result via HTTP callback instead of polling. See [Webhooks](/reference/api/webhooks) for the full spec.
 </ParamField>
 
 <Note>
@@ -51,7 +51,7 @@ The minimal request body to send a user message:
 
 **`202 Accepted`** — returns a `MessageResponse` and a `Location` header pointing to the session.
 
-**Headers**: `Location: /sessions/{session_id}`
+**Headers**: `Location: /sessions/\{session_id}`
 
 ```json
 { "session_id": "550e8400-e29b-41d4-a716-446655440000", "status": "running" }
@@ -74,7 +74,7 @@ The minimal request body to send a user message:
 
 ---
 
-## GET /sessions/{session_id}/messages
+## GET /sessions/\{session_id}/messages
 
 Retrieve the full conversation history managed by the agent for this session.
 

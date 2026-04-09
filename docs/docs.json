@@ -86,16 +86,35 @@
               {
                 "group": "CLI",
                 "pages": [
-                  "reference/cli-serve",
-                  "reference/cli-deploy"
+                  "reference/cli/overview",
+                  {
+                    "group": "motus serve",
+                    "pages": [
+                      "reference/cli/serve/overview",
+                      "reference/cli/serve/start",
+                      "reference/cli/serve/chat",
+                      "reference/cli/serve/health",
+                      "reference/cli/serve/create",
+                      "reference/cli/serve/sessions",
+                      "reference/cli/serve/get",
+                      "reference/cli/serve/delete",
+                      "reference/cli/serve/messages",
+                      "reference/cli/serve/send"
+                    ]
+                  },
+                  "reference/cli/deploy",
+                  "reference/cli/login",
+                  "reference/cli/logout",
+                  "reference/cli/whoami"
                 ]
               },
               {
                 "group": "REST API",
                 "pages": [
-                  "reference/api-sessions",
-                  "reference/api-messages",
-                  "reference/api-webhooks"
+                  "reference/api/overview",
+                  "reference/api/sessions",
+                  "reference/api/messages",
+                  "reference/api/webhooks"
                 ]
               }
             ]
@@ -103,5 +122,12 @@
         ]
       }
     ]
-  }
+  },
+  "redirects": [
+    { "source": "/reference/cli-serve", "destination": "/reference/cli/serve/overview" },
+    { "source": "/reference/cli-deploy", "destination": "/reference/cli/deploy" },
+    { "source": "/reference/api-sessions", "destination": "/reference/api/sessions" },
+    { "source": "/reference/api-messages", "destination": "/reference/api/messages" },
+    { "source": "/reference/api-webhooks", "destination": "/reference/api/webhooks" }
+  ]
 }
