@@ -71,6 +71,30 @@ def _parse_json_attr(span, key: str) -> dict | list | None:
 class MotusSpanProcessor:
     """Receives OTEL spans from Google ADK and forwards them to motus TraceManager.
 
+    Google ADK's OTEL hierarchy includes internal spans (without
+    ``gen_ai.operation.name``) between ``invoke_agent`` and
+    ``generate_content``::
+
+        [internal runner span]          ← no gen_ai.operation.name
+        └── invoke_agent
+            └── [internal span]         ← no gen_ai.operation.name
+                └── generate_content
+                    ├── execute_tool
+                    └── execute_tool
+
+    This processor collapses the non-ADK intermediate spans so that the
+    ADK hierarchy is preserved cleanly::
+
+        agent_call
+        └── model_call
+            ├── tool_call
+            └── tool_call
+
+    Non-ADK spans are tracked for parent-chain resolution but never
+    ingested.  When a non-ADK span ends (after all its children), any
+    children that pointed to it are re-parented to its own parent via
+    ``update_external_span``.
+
     Usage::
 
         from google.adk.telemetry.setup import OTelHooks, maybe_set_otel_providers
@@ -81,10 +105,11 @@ class MotusSpanProcessor:
 
     def __init__(self, trace_manager) -> None:
         self._tm = trace_manager
-        # Map OTEL span_id (int) → pre-allocated motus task_id (int).
-        # Populated in on_start so that children can resolve their parent's
-        # motus task_id when they finish (on_end) before the parent does.
+        # OTEL span_id → pre-allocated motus task_id.
         self._span_id_map: dict[int, int] = {}
+        # motus task_id → list of child motus task_ids.  Used to re-parent
+        # children when a non-ADK intermediate span ends.
+        self._children: dict[int, list[int]] = {}
 
     def on_start(self, span, parent_context=None) -> None:
         """Pre-allocate a motus task_id and record the OTEL→motus mapping."""
@@ -97,22 +122,30 @@ class MotusSpanProcessor:
         if not self._tm.config.is_collecting:
             return
 
-        op = _get_attr(span, _OP_NAME)
-        if op is None:
-            return  # Not an ADK span
-
-        task_type, func_name = self._classify(span, op)
-
-        # Resolve pre-allocated motus task_id for this span
         ctx = getattr(span, "context", None)
         otel_span_id = ctx.span_id if ctx else None
         task_id = self._span_id_map.pop(otel_span_id, None) if otel_span_id else None
 
-        # Resolve parent: map OTEL parent span_id → motus task_id
+        # Resolve OTEL parent → motus task_id
         parent_ctx = getattr(span, "parent", None)
-        parent_task_id = None
-        if parent_ctx is not None:
-            parent_task_id = self._span_id_map.get(parent_ctx.span_id)
+        parent_task_id = (
+            self._span_id_map.get(parent_ctx.span_id) if parent_ctx else None
+        )
+
+        op = _get_attr(span, _OP_NAME)
+        if op is None:
+            # Non-ADK intermediate span (e.g. gRPC/GenAI SDK internals).
+            # Collapse: re-parent any children that resolved to this span's
+            # task_id so they point to this span's own parent instead.
+            # Safe because OTEL guarantees children end before parents.
+            if task_id is not None:
+                for child_id in self._children.pop(task_id, []):
+                    self._tm.update_external_span(child_id, {"parent": parent_task_id})
+                    if parent_task_id is not None:
+                        self._children.setdefault(parent_task_id, []).append(child_id)
+            return
+
+        task_type, func_name = self._classify(span, op)
 
         start_ns = getattr(span, "start_time", None) or 0
         end_ns = getattr(span, "end_time", None) or 0
@@ -136,13 +169,16 @@ class MotusSpanProcessor:
         self._enrich_meta(meta, span, op)
         self._tm.ingest_external_span(meta, task_id=task_id)
 
+        # Track as child of parent so non-ADK ancestors can re-parent us
+        if parent_task_id is not None and task_id is not None:
+            self._children.setdefault(parent_task_id, []).append(task_id)
+
     def shutdown(self) -> None:
-        pass
+        self._span_id_map.clear()
+        self._children.clear()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return True
-
-    # ── internal helpers ──
 
     @staticmethod
     def _classify(span, op: str) -> tuple[str, str]:
