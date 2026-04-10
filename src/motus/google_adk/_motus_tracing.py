@@ -8,6 +8,7 @@ in the motus trace viewer, Jaeger export, and analytics pipeline.
 
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 from typing import Any
@@ -42,6 +43,14 @@ def _span_time_us(span, attr: str) -> int:
     return ns // 1000
 
 
+def _ns_to_iso(ns: int) -> str:
+    """Convert nanoseconds since epoch to ISO 8601 string."""
+    if not ns:
+        return ""
+    dt = datetime.datetime.fromtimestamp(ns / 1e9, tz=datetime.timezone.utc)
+    return dt.isoformat()
+
+
 def _get_attr(span, key: str, default=None):
     """Safely get a span attribute."""
     attrs = getattr(span, "attributes", None) or {}
@@ -72,9 +81,16 @@ class MotusSpanProcessor:
 
     def __init__(self, trace_manager) -> None:
         self._tm = trace_manager
+        # Map OTEL span_id (int) → pre-allocated motus task_id (int).
+        # Populated in on_start so that children can resolve their parent's
+        # motus task_id when they finish (on_end) before the parent does.
+        self._span_id_map: dict[int, int] = {}
 
     def on_start(self, span, parent_context=None) -> None:
-        pass  # We process on end when all attributes are populated
+        """Pre-allocate a motus task_id and record the OTEL→motus mapping."""
+        ctx = getattr(span, "context", None)
+        if ctx is not None:
+            self._span_id_map[ctx.span_id] = self._tm.allocate_external_task_id()
 
     def on_end(self, span) -> None:
         """Convert a completed OTEL span to motus task_meta and ingest."""
@@ -87,14 +103,28 @@ class MotusSpanProcessor:
 
         task_type, func_name = self._classify(span, op)
 
+        # Resolve pre-allocated motus task_id for this span
+        ctx = getattr(span, "context", None)
+        otel_span_id = ctx.span_id if ctx else None
+        task_id = self._span_id_map.pop(otel_span_id, None) if otel_span_id else None
+
+        # Resolve parent: map OTEL parent span_id → motus task_id
+        parent_ctx = getattr(span, "parent", None)
+        parent_task_id = None
+        if parent_ctx is not None:
+            parent_task_id = self._span_id_map.get(parent_ctx.span_id)
+
+        start_ns = getattr(span, "start_time", None) or 0
+        end_ns = getattr(span, "end_time", None) or 0
+
         meta: dict[str, Any] = {
             "func": func_name,
             "task_type": task_type,
-            "parent": None,  # OTEL parent resolution handled below
-            "started_at": "",
-            "start_us": _span_time_us(span, "start_time"),
-            "ended_at": "",
-            "end_us": _span_time_us(span, "end_time"),
+            "parent": parent_task_id,
+            "started_at": _ns_to_iso(start_ns),
+            "start_us": start_ns // 1000 if start_ns else 0,
+            "ended_at": _ns_to_iso(end_ns),
+            "end_us": end_ns // 1000 if end_ns else 0,
             "adk_operation": op,
         }
 
@@ -104,7 +134,7 @@ class MotusSpanProcessor:
             meta["error"] = error_type
 
         self._enrich_meta(meta, span, op)
-        self._tm.ingest_external_span(meta)
+        self._tm.ingest_external_span(meta, task_id=task_id)
 
     def shutdown(self) -> None:
         pass
