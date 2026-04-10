@@ -7,15 +7,12 @@ Motus ships as a single Python package, `lithosai-motus`, that includes both the
 
 ## Prerequisites
 
-Before you install Motus, make sure you have:
+You need a Python package manager. Either works:
 
-- **Python 3.12 or later** (check with `python --version` or `python3 --version`)
-- **uv** (recommended) or pip
-- An API key from at least one LLM provider: OpenAI, Anthropic, Gemini, or OpenRouter
+- **uv** (recommended). Installs with `curl -LsSf https://astral.sh/uv/install.sh | sh`. uv manages Python for you, so you do not need to install Python separately.
+- **pip** with **Python 3.12 or later** already installed (check with `python --version`).
 
-<Tip>
-  If you do not have uv yet, install it with `curl -LsSf https://astral.sh/uv/install.sh | sh`. uv is faster and less flaky than pip.
-</Tip>
+That is all you need to install Motus. Provider API keys are not required to install or to deploy. See [Set your API keys](#set-your-api-keys-optional) below if you plan to run agents against your own provider account.
 
 ## Install
 
@@ -49,9 +46,9 @@ Before you install Motus, make sure you have:
   </Tab>
 </Tabs>
 
-### Optional SDK extras
+### Bring your existing agent framework
 
-Skip this section unless you plan to run agents written with the OpenAI Agents SDK or the Google ADK. Install the matching extra to pull in their dependencies.
+Motus works hand in hand with the agent frameworks you already use. If you have agents written with the OpenAI Agents SDK or the Google ADK, keep them. Install the matching extra and Motus serves, deploys, and traces them alongside its own agents with no code changes.
 
 <Tabs>
   <Tab title="OpenAI Agents SDK">
@@ -115,9 +112,11 @@ motus --help
   If `motus` is not found after a pip install, make sure the Python `Scripts/bin` directory is on your PATH, or use `python -m motus` instead. uv users can run the CLI with `uv run motus`.
 </Tip>
 
-## Set your API keys
+## Set your API keys (optional)
 
-Motus reads provider keys from environment variables at runtime. Pick the provider you plan to use and export its key. You only need one.
+This step is only needed if you want to run agents against your own provider account. Motus Cloud deployments and agents using the Motus model proxy do not need your own keys.
+
+Pick a provider and export its key. You only need one.
 
 ```bash
 export OPENAI_API_KEY=sk-...
@@ -128,10 +127,6 @@ export GEMINI_API_KEY=...
 # or
 export OPENROUTER_API_KEY=sk-or-...
 ```
-
-<Note>
-  If you are not sure which provider to pick, OpenAI's `gpt-4o` and Anthropic's Claude Sonnet 4 are both good starting points.
-</Note>
 
 See [Configuration](/getting-started/configuration) for the full list of environment variables, `motus.toml` project settings, and `.env` file support.
 
