@@ -64,11 +64,16 @@ then
 	claude plugin install "$product@LithosAI" 2>/dev/null || true
 	python3 -c "
 import json; from pathlib import Path
-p = Path.home() / '.claude/plugins/known_marketplaces.json'
-if p.exists():
+for p in [
+    Path.home() / '.claude/plugins/known_marketplaces.json',
+    Path.home() / '.claude/settings.json',
+]:
+    if not p.exists(): continue
     d = json.loads(p.read_text())
-    if 'LithosAI' in d:
-        d['LithosAI']['autoUpdate'] = True
+    # settings.json nests under extraKnownMarketplaces
+    m = d.get('extraKnownMarketplaces', d)
+    if 'LithosAI' in m:
+        m['LithosAI']['autoUpdate'] = True
         p.write_text(json.dumps(d, indent=2) + '\n')
 " 2>/dev/null || true
 	add_installed "Claude Code"
