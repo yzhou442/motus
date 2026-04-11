@@ -1,183 +1,138 @@
 ---
 title: "Architecture Overview"
-description: "Core modules that compose into a full agent stack — agents, tools, models, memory, runtime, serving, and tracing."
+description: "A map of the Motus library: the two ways you write agents, the runtime they share, and where each concept lives."
 ---
 
-Motus has five core modules that compose into a full agent stack.
+Motus is an open source agent serving project. It also ships a Python library for writing the agents you serve. This page is a map of that library: the two programming models it supports, the runtime underneath them, and where to go for each concept.
 
-```python
+Read it first if you are new. Come back whenever you need to remember how the pieces fit.
+
+## Two programming models on one runtime
+
+Motus gives you two ways to write an agent, and both run on the same underlying runtime. You pick the one that matches your problem, and you can freely mix them.
+
+<CardGroup cols={2}>
+  <Card title="ReActAgent: the reasoning loop" icon="robot" href="/concepts/agents">
+    The model decides what to do next. You hand `ReActAgent` a client, a set of tools, and a system prompt. It calls the model, runs any tool calls the model asks for, feeds the results back, and loops until the model returns a final answer.
+  </Card>
+  <Card title="@agent_task: the workflow graph" icon="diagram-project" href="/concepts/runtime">
+    You decide what to do next. Decorate plain Python functions with `@agent_task`, call them, and Motus turns the data flow between them into a parallel task graph. No DAG wiring, no YAML.
+  </Card>
+</CardGroup>
+
+Roughly, the two shapes look like this:
+
+```python ReActAgent
 from motus.agent import ReActAgent
 from motus.models import OpenAIChatClient
-from motus.memory import CompactionMemory
 
-def get_weather(city: str) -> str:
-    """Return current weather for a city."""
-    return f"Sunny, 72°F in {city}"
-
-client = OpenAIChatClient()
 agent = ReActAgent(
-    client=client,
+    client=OpenAIChatClient(),
     model_name="gpt-4o",
-    system_prompt="You answer weather questions.",
-    tools=[get_weather],
-    memory=CompactionMemory(),
+    tools=[weather, search],
 )
-response = await agent("What's the weather in Tokyo?")
+answer = await agent("What's the weather in Tokyo?")
 ```
 
-That snippet touches every layer except serving and tracing — a model client, an agent, a bare function as a tool, and compaction memory.
-The sections below explain each layer and how they connect.
+```python @agent_task
+from motus.runtime import agent_task, resolve
 
-## Architecture
+@agent_task
+def fetch(url): ...
+
+@agent_task
+def summarize(pages): ...
+
+pages = [fetch(url) for url in urls]   # parallel fetches
+result = resolve(summarize(pages))     # runs once every fetch is done
+```
+
+### When to reach for which
+
+`ReActAgent` is the right default for chat assistants, research agents, coding agents, and anything else where you want the model doing the planning. You get the reasoning loop, tool dispatch, memory, guardrails, and tracing for free.
+
+`@agent_task` is the right default for pipelines you already know the shape of: parallel scrapers, multi-stage extractors, fan-out fan-in over a list of inputs, batch jobs that call an LLM many times. You get parallelism, retries, and timeouts on every step without wiring up a scheduler yourself.
+
+Most non-trivial projects use both. A workflow task can call a `ReActAgent`. One agent can be exposed as a tool to another agent via `as_tool()`. Under the hood both styles share the same runtime, so tracing, retries, cancellation, and error propagation all behave the same way no matter which style you choose.
+
+## The layers
 
 ```mermaid
-graph TD
-    subgraph Serving
-        S[AgentServer / serve2]
-    end
+flowchart TD
+    Serve["Serving layer<br/>(motus serve, motus deploy, Motus Cloud)"]
+    Code["Your code<br/>(ReActAgent and/or @agent_task)"]
+    Runtime["Runtime<br/>(GraphScheduler + AgentFuture)"]
+    Models["Model clients"]
+    Tools["Tools"]
+    Memory["Memory"]
+    Tracing["Tracing"]
 
-    subgraph Agent
-        A[ReActAgent]
-    end
-
-    subgraph Tools
-        FT[FunctionTool]
-        AT[AgentTool]
-        MCP[MCPSession]
-    end
-
-    subgraph Models
-        BC[BaseChatClient]
-        OAI[OpenAIChatClient]
-        ANT[AnthropicChatClient]
-        GEM[GeminiChatClient]
-        OR[OpenRouterChatClient]
-    end
-
-    subgraph Memory
-        BM[BasicMemory]
-        CM[CompactionMemory]
-    end
-
-    subgraph Runtime
-        GS[GraphScheduler]
-        AGT["@agent_task"]
-        AF[AgentFuture]
-    end
-
-    subgraph Tracing
-        TM[TraceManager]
-    end
-
-    S --> A
-    A --> FT & AT & MCP
-    A --> BC
-    BC --> OAI & ANT & GEM & OR
-    A --> BM & CM
-    A --> AGT
-    AGT --> GS
-    GS --> AF
-    TM -.->|observes| GS
+    Serve --> Code
+    Code --> Runtime
+    Runtime --> Models
+    Runtime --> Tools
+    Runtime --> Memory
+    Tracing -. observes .-> Runtime
 ```
 
-Arrows show dependency direction: `AgentServer` wraps an `Agent`, the agent calls tools, queries a model, and stores conversation state in memory.
-Every LLM call and tool invocation runs as an `@agent_task` on the `GraphScheduler`, which returns an `AgentFuture`.
-`TraceManager` hooks into the runtime to record spans without changing execution flow.
+From the top down:
 
-## Module Summary
+1. **Serving** wraps any agent behind a session-based HTTP API. `motus serve` runs it locally, `motus deploy` ships the same code to Motus Cloud, and the REST surface is identical on both. A session is one persistent conversation between a user and an agent.
+2. **Your code** sits under the serving layer. It is a `ReActAgent`, a set of `@agent_task` functions, or both.
+3. **The runtime** is where everything actually executes. Every model call, every tool call, and every `@agent_task` invocation becomes a node in a task graph. A scheduler (`GraphScheduler`) runs the graph, and each node returns an `AgentFuture` that tracks its result and any downstream dependencies.
+4. **Models, tools, and memory** are pluggable services your code reaches for. The runtime invokes them as tasks, so retries, timeouts, and tracing apply uniformly.
+5. **Tracing** watches the runtime through lifecycle hooks. It records spans for every task without you instrumenting anything by hand.
 
-| Module | What it does | Key classes | Guide |
-|--------|-------------|-------------|-------|
-| **Agent** | Runs the reasoning loop — observe, think, act, repeat | `ReActAgent`, `AgentBase` | [Agents](/concepts/agents) |
-| **Tools** | Defines what an agent can do — functions, sub-agents, MCP servers | `FunctionTool`, `AgentTool`, `MCPSession` | [Tools](/concepts/tools) |
-| **Models** | Connects to LLM providers through a unified interface | `BaseChatClient`, `OpenAIChatClient`, `AnthropicChatClient`, `GeminiChatClient`, `OpenRouterChatClient` | [Models](/concepts/models) |
-| **Memory** | Manages conversation context — sliding window, auto-compaction | `BasicMemory`, `CompactionMemory` | [Memory](/concepts/memory) |
-| **Runtime** | Schedules tasks as a DAG and resolves futures | `GraphScheduler`, `@agent_task`, `AgentFuture` | [Runtime](/concepts/runtime) |
-| **Serving** | Wraps any agent behind an HTTP endpoint | `AgentServer`, `serve2` | [Serving](/guides/serving) |
-| **Tracing** | Records spans and metrics for debugging | `TraceManager` | [Tracing](/guides/tracing) |
+## Module map
 
-## How They Connect
+Jump straight to the page you need.
 
-You start by creating a model client.
-You pass that client to `ReActAgent` along with a list of tools and a memory instance.
-When the agent runs, each LLM call and each tool invocation becomes an `@agent_task`.
-The `GraphScheduler` executes these tasks, respecting dependencies between them, and returns `AgentFuture` objects that resolve when the work completes.
-`TraceManager` hooks into the runtime through lifecycle hooks and records every task as a span — you do not instrument calls yourself.
-To serve the agent over HTTP, wrap it with `AgentServer` and call `serve2`.
+| Concept | Reach for it when... | Page |
+|---|---|---|
+| **Agents** | You want an LLM to drive a loop over tools | [Agents](/concepts/agents) |
+| **Tools** | You want to give an agent a new capability | [Tools](/concepts/tools) |
+| **Models** | You want to swap providers or configure reasoning and caching | [Models](/concepts/models) |
+| **Memory** | You want multi-turn context that handles long conversations | [Memory](/concepts/memory) |
+| **Runtime** | You want a parallel workflow or a custom task graph | [Runtime](/concepts/runtime) |
+| **Guardrails** | You want to validate inputs or outputs before or after a turn | [Guardrails](/guides/guardrails) |
+| **Human in the loop** | You want to pause mid-turn for approval or clarification | [Human in the Loop](/guides/human-in-the-loop) |
+| **Multi-agent** | You want one agent to call another as a tool | [Multi-agent](/guides/multi-agent) |
+| **MCP** | You want to pull tools from an MCP server | [MCP Integration](/guides/mcp-integration) |
+| **Skills** | You want the agent to load extra instructions and examples on demand | [Skills](/concepts/skills) |
 
-```python
-from motus.serve2 import AgentServer
+For the serving and deployment side, see [Serving](/guides/serving), [Deployment](/guides/deployment), and [Tracing](/guides/tracing).
 
-server = AgentServer(agent)
-server.run(host="0.0.0.0", port=8000)
-```
+## Life of a task
 
-The server exposes a session-based REST API (`/sessions`, `/sessions/{id}/messages`) for multi-turn conversations.
-
-## Lifecycle of a Single Turn
+An agent turn and a workflow step both land on the runtime the same way. Here is the agent turn, since it is the richer case.
 
 <Steps>
-  <Step title="User message arrives">
-    A user message arrives (directly or through `AgentServer`).
+  <Step title="The message reaches the agent">
+    The server appends the user message to the session's memory and hands control to the agent.
   </Step>
-  <Step title="Append to memory">
-    `ReActAgent` appends it to memory.
+  <Step title="The agent calls the model">
+    `ReActAgent` submits a model call as an `@agent_task`. The scheduler runs it, the model client hits the provider, and the result comes back as an `AgentFuture`.
   </Step>
-  <Step title="Call the model">
-    The agent creates an `@agent_task` to call the model.
+  <Step title="Tools run in parallel when possible">
+    If the model returns tool calls, each one becomes another `@agent_task`. Independent tool calls are submitted together so the runtime can run them concurrently, and the agent then awaits their futures.
   </Step>
-  <Step title="Model responds">
-    The model returns a response — either a final answer or a tool call.
+  <Step title="The loop repeats">
+    Tool results feed into the next model call. This continues until the model returns a final answer. If the agent hits `max_steps` first it raises `RuntimeError` instead, and if `timeout` is set it stops gracefully after the current step.
   </Step>
-  <Step title="Tool call (if needed)">
-    If a tool call: the agent creates another `@agent_task` for the tool, waits for its `AgentFuture`, and loops back to step 3 with the tool result.
-  </Step>
-  <Step title="Final answer">
-    If a final answer: the agent returns the response and memory records it.
-  </Step>
-  <Step title="Tracing">
-    `TraceManager` emits spans for every task in steps 3-5.
+  <Step title="Memory and tracing settle">
+    The final answer goes back through the server, memory records the turn, and `TraceManager` has already captured spans for every model and tool call along the way.
   </Step>
 </Steps>
 
-## Reading Guide
+A workflow step takes the same path with the reasoning loop removed. You submit tasks, the scheduler runs them as their dependencies resolve, and you call `resolve()` (or `await` inside another task) to get the final value. Every step is traced and retried under the same rules.
 
-Pick a path based on what you want to do.
+## Where to go next
 
-**Build an agent from scratch**
+Pick a starting point based on what you want to build.
 
-1. [Agents](/concepts/agents) — create a `ReActAgent`, configure its reasoning loop
-2. [Tools](/concepts/tools) — define tools with `FunctionTool`, compose agents with `AgentTool`
-3. [Models](/concepts/models) — choose and configure an LLM provider
-
-**Add memory to an existing agent**
-
-1. [Memory](/concepts/memory) — pick a memory strategy, configure compaction
-
-**Connect to MCP servers**
-
-1. [MCP Integration](/guides/mcp-integration) — use `MCPSession` to connect to external tool servers
-
-**Deploy to production**
-
-1. [Serving](/guides/serving) — wrap your agent with `AgentServer`
-2. [Deployment](/guides/deployment) — deploy to cloud infrastructure
-3. [CLI](/reference/cli/serve/overview) — use the `motus` CLI for local development
-
-**Debug and trace**
-
-1. [Tracing](/guides/tracing) — enable `TraceManager`, view spans, export to OpenTelemetry
-
-**Build multi-step workflows**
-
-1. [Runtime](/concepts/runtime) — use `@agent_task` and `GraphScheduler` to build task graphs
-2. [Guardrails](/guides/guardrails) — add input/output validation
-
-**Integrate with other frameworks**
-
-1. [OpenAI Agents SDK compatibility](/integrations/openai-agents)
-2. [Claude Agent SDK compatibility](/integrations/anthropic-sdk)
-
-## Next Steps
-
-Start with [Agents](/concepts/agents) to build your first agent.
+- **A single LLM driven assistant.** Start with [Agents](/concepts/agents), then [Tools](/concepts/tools), then [Memory](/concepts/memory).
+- **A parallel pipeline or batch job.** Start with [Runtime](/concepts/runtime). Circle back to [Agents](/concepts/agents) if any step needs an LLM.
+- **A team of agents.** See [Multi-agent](/guides/multi-agent) for how `as_tool()` turns one agent into a tool for another.
+- **An agent that needs external tools.** See [MCP Integration](/guides/mcp-integration) to plug in any MCP server.
+- **An existing agent from another framework.** See the [Integrations](/integrations/openai-agents) tab for OpenAI Agents SDK, Anthropic SDK, and Google ADK adapters.
+- **Shipping any of the above.** See [Serving](/guides/serving) for the REST API and [Deployment](/guides/deployment) for the cloud workflow.
