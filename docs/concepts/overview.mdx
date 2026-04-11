@@ -10,10 +10,10 @@ Motus is an open source agent serving project. It also ships a Python library fo
 Motus gives you two ways to write an agent, and both run on the same underlying runtime. You pick the one that matches your problem, and the two can be combined when you need to.
 
 <CardGroup cols={2}>
-  <Card title="ReActAgent: the reasoning loop" icon="robot" href="/concepts/agents">
+  <Card title="ReActAgent" icon="robot" href="/concepts/agents">
     For exploratory, open-ended problems. The model decides what to do next. You hand `ReActAgent` a client, a set of tools, and a system prompt. It calls the model, runs any tool calls the model asks for, feeds the results back, and loops until the model returns a final answer.
   </Card>
-  <Card title="Workflow: the task graph" icon="diagram-project" href="/concepts/runtime">
+  <Card title="Workflow" icon="diagram-project" href="/concepts/runtime">
     For stable control over a known-good procedure. You decide what to do next. Decorate plain Python functions with `@agent_task`, call them, and Motus turns the data flow between them into a parallel task graph. No DAG wiring, no YAML.
   </Card>
 </CardGroup>
@@ -53,33 +53,18 @@ Reach for `Workflow` when the procedure is already a solved problem and you want
 
 The two compose. A workflow step can call a `ReActAgent` when part of an otherwise stable pipeline needs exploration. An agent can delegate to another agent via `as_tool()` when one exploratory loop should hand off to a more specialized one.
 
-## The layers
+## The pieces
 
-```mermaid
-flowchart TD
-    Serve["Serving layer<br/>(motus serve, motus deploy, Motus Cloud)"]
-    Code["Your code<br/>(ReActAgent and/or Workflow)"]
-    Runtime["Runtime<br/>(GraphScheduler + AgentFuture)"]
-    Models["Model clients"]
-    Tools["Tools"]
-    Memory["Memory"]
-    Tracing["Tracing"]
+A Motus agent, whether you write it as a `ReActAgent` or as a Workflow, is assembled from the same small set of pieces.
 
-    Serve --> Code
-    Code --> Runtime
-    Runtime --> Models
-    Runtime --> Tools
-    Runtime --> Memory
-    Tracing -. observes .-> Runtime
-```
+- **Model clients** talk to LLM providers. `OpenAIChatClient`, `AnthropicChatClient`, `GeminiChatClient`, and `OpenRouterChatClient` share one interface, so swapping providers is a one line change. Local models work through `base_url`.
+- **Tools** are what an agent can actually call: a plain Python function decorated with `@tool`, a class method decorated with `@tools`, an MCP server wrapped with `get_mcp()`, or another agent wrapped with `as_tool()`.
+- **Memory** is the conversation state an agent carries across turns. `BasicMemory` appends messages in order; `CompactionMemory` summarizes older turns when the context window starts to fill.
+- **Guardrails** are validation hooks you attach to inputs, outputs, or individual tools. They rewrite a value, raise to block, or pass it through.
+- **The runtime** is the task scheduler sitting under everything else. When a `ReActAgent` asks the model for a completion or runs a tool, that call is submitted as an `@agent_task` and the runtime executes it. Independent tasks run in parallel, each one returns an `AgentFuture` that tracks its result and its dependencies, and retries, timeouts, and cancellation all live at this level. This is also what you are using directly when you decorate Workflow steps with `@agent_task`.
+- **Serving** wraps any agent behind a session-based HTTP API. `motus serve` runs the server on your machine, `motus deploy` ships the same code to Motus Cloud, and the REST surface is identical on both. A session is one persistent conversation with an agent.
 
-From the top down:
-
-1. **Serving** wraps any agent behind a session-based HTTP API. `motus serve` runs it locally, `motus deploy` ships the same code to Motus Cloud, and the REST surface is identical on both. A session is one persistent conversation between a user and an agent.
-2. **Your code** sits under the serving layer. It is a `ReActAgent`, a Workflow built out of `@agent_task` functions, or both.
-3. **The runtime** is where everything actually executes. Every model call, every tool call, and every workflow step becomes a node in a task graph. A scheduler (`GraphScheduler`) runs the graph, and each node returns an `AgentFuture` that tracks its result and any downstream dependencies.
-4. **Model calls and tool calls** go through the runtime as tasks, which is how retries, timeouts, and tracing apply to them uniformly. **Memory** is not a task: it is session state the agent reads and writes directly around each turn.
-5. **Tracing** watches the runtime through lifecycle hooks. It records spans for every task without you instrumenting anything by hand.
+Tracing piggybacks on the runtime through lifecycle hooks, so every task that runs gets a span without you instrumenting anything by hand. Turn it on with one environment variable.
 
 ## Module map
 
