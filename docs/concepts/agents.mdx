@@ -279,14 +279,16 @@ Adaptive models accept `effort="low" | "medium" | "high" | "max"`. Non-adaptive 
 
 ## Prompt caching
 
-On providers that support it (Anthropic today), the agent caches its prompt prefix automatically. Control this with `cache_policy`.
+On Anthropic models, the agent places cache breakpoints on the repeating part of your prompt so that system prompt, tool definitions, and prior conversation turns are read from cache instead of billed as fresh input on every call. `cache_policy` controls how aggressive this is.
 
-| Policy | What gets cached |
-|---|---|
-| `"none"` | Nothing |
-| `"static"` | System prompt and tool definitions, 5 minute TTL |
-| `"auto"` (default) | Static plus the conversation-turn prefix, 5 minute TTL |
-| `"auto_1h"` | Same as auto but with a 1 hour TTL, best for long-running agents |
+| Policy | Cache breakpoints | TTL |
+|---|---|---|
+| `"none"` | None | n/a |
+| `"static"` | System prompt and tool definitions | 5 minutes |
+| `"auto"` (default) | Static plus the end of the previous conversation turn | 5 minutes |
+| `"auto_1h"` | Same as `"auto"` | 1 hour |
+
+Under `"auto"`, Motus tags the second-to-last user or tool-result message with a cache breakpoint on every call. The net effect is that on step N+1, the entire prompt prefix up to and including turn N is a cache read, and only the latest turn is fresh tokens. `"auto_1h"` is the same strategy with a longer TTL, useful for long-lived agents where the prefix is reused over timescales greater than five minutes.
 
 ```python
 from motus.models import AnthropicChatClient, CachePolicy
@@ -300,41 +302,42 @@ agent = ReActAgent(
 
 See [Models](/concepts/models) for more on prompt caching and provider support.
 
-## Async context manager
+## MCP and other lazy tools
 
-If any of your tools are backed by an MCP server or another lazy resource, use the agent as an async context manager. This opens and closes the tool connections cleanly.
+When you pass tools backed by an MCP server, the recommended pattern is to connect the session with `async with get_mcp(...) as session` and pass the connected session into the agent:
 
 ```python
-async with ReActAgent(
-    client=OpenAIChatClient(),
-    model_name="gpt-4o",
-    tools=[my_mcp_tools],
-) as agent:
-    response = await agent("What's the weather in Tokyo?")
+from motus.tools import get_mcp
+
+async with get_mcp(command="...", args=[...]) as session:
+    agent = ReActAgent(
+        client=OpenAIChatClient(),
+        model_name="gpt-4o",
+        tools=[session],
+    )
+    response = await agent("...")
 ```
 
-For agents with only plain function tools, this is optional. For MCP-backed tools it is the recommended pattern, since the session must be connected before first use and torn down on exit.
+If you pass an unconnected `get_mcp()` session to the agent without `async with`, the agent will connect it lazily on first run. Both patterns work; the context manager version gives you deterministic cleanup on exit. See [MCP Integration](/guides/mcp-integration) for the full guide.
 
 ## Constructor reference
-
-<Accordion title="Full parameter list">
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `client` | `BaseChatClient` | required | LLM provider client |
 | `model_name` | `str` | required | Model identifier (e.g. `"gpt-4o"`, `"claude-opus-4-6"`) |
-| `name` | `str \| None` | auto-inferred | Agent name, used in tracing and tool registration. If unset, Motus infers it from the caller's variable name or falls back to the class name. |
+| `name` | `str \| None` | auto-inferred | Agent name, used in tracing and tool registration |
 | `system_prompt` | `str \| None` | `None` | System prompt prepended to every LLM call |
 | `tools` | list, dict, callable, or `Tools` | `None` | Tools available to the agent |
 | `response_format` | `type[BaseModel] \| None` | `None` | Structured output via a Pydantic model |
-| `max_steps` | `int` | `20` | Max reasoning-and-acting cycles before the agent raises `RuntimeError` |
-| `timeout` | `float \| None` | `None` | Wall-clock deadline in seconds; raises `TimeoutError` when exceeded |
+| `max_steps` | `int` | `20` | Max loop cycles before the agent raises `RuntimeError` |
+| `timeout` | `float \| None` | `None` | Wall-clock deadline in seconds; raises `TimeoutError` |
 | `memory_type` | `"basic" \| "compact"` | `"basic"` | Memory strategy, ignored if `memory` is passed |
-| `memory` | `BaseMemory \| None` | `None` | Custom memory instance (overrides `memory_type`) |
-| `input_guardrails` | `list[Callable]` | `[]` | Hooks run on the user prompt before the agent starts |
-| `output_guardrails` | `list[Callable]` | `[]` | Hooks run on the final result |
+| `memory` | `BaseMemory \| None` | `None` | Custom memory instance, overrides `memory_type` |
+| `input_guardrails` | `list[Callable]` | `[]` | Hooks on the user prompt before the agent runs |
+| `output_guardrails` | `list[Callable]` | `[]` | Hooks on the final result |
 | `reasoning` | `ReasoningConfig` | `ReasoningConfig.auto()` | Extended thinking configuration |
 | `cache_policy` | `CachePolicy \| str` | `"auto"` | Prompt caching strategy (Anthropic only) |
-| `step_callback` | `Callable \| None` | `None` | Async callback fired after each LLM step that has tool calls |
+| `step_callback` | `Callable \| None` | `None` | Async callback fired after each LLM step with tool calls |
 
-</Accordion>
+If `name` is not passed, Motus infers it from the variable you assigned the agent to on first call, falling back to the class name.
