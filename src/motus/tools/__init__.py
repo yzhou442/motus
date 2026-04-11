@@ -70,7 +70,7 @@ __all__ = [
 
 
 def DEFAULT_TOOL_PROVIDER():
-    return CompositeToolProvider([CloudSandboxToolProvider(), DockerToolProvider()])
+    return CompositeToolProvider([CloudSandboxToolProvider()])
 
 
 # ---------------------------------------------------------------------------
