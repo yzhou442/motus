@@ -680,6 +680,20 @@ MINIMAX_MODELS: Dict[str, ModelLimits] = {
         max_output_tokens=131_072,
         description="MiniMax M2.7 - next-gen reasoning model",
     ),
+    "moonshotai/kimi-k2.5": ModelLimits(
+        model_id="moonshotai/kimi-k2.5",
+        provider=ModelProvider.OPENAI,
+        context_window=262_144,
+        max_output_tokens=65_536,
+        description="Kimi K2.5 - strong open-source coding/reasoning model",
+    ),
+    "deepseek/deepseek-r2": ModelLimits(
+        model_id="deepseek/deepseek-r2",
+        provider=ModelProvider.OPENAI,
+        context_window=128_000,
+        max_output_tokens=64_000,
+        description="DeepSeek R2 - strong open-source reasoning model",
+    ),
     "openai/gpt-5-mini": ModelLimits(
         model_id="openai/gpt-5-mini",
         provider=ModelProvider.OPENAI,
