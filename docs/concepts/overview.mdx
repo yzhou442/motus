@@ -5,18 +5,16 @@ description: "A map of the Motus library: the two ways you write agents, the run
 
 Motus is an open source agent serving project. It also ships a Python library for writing the agents you serve. This page is a map of that library: the two programming models it supports, the runtime underneath them, and where to go for each concept.
 
-Read it first if you are new. Come back whenever you need to remember how the pieces fit.
-
 ## Two programming models on one runtime
 
-Motus gives you two ways to write an agent, and both run on the same underlying runtime. You pick the one that matches your problem, and you can freely mix them.
+Motus gives you two ways to write an agent, and both run on the same underlying runtime. You pick the one that matches your problem, and the two can be combined when you need to.
 
 <CardGroup cols={2}>
   <Card title="ReActAgent: the reasoning loop" icon="robot" href="/concepts/agents">
-    The model decides what to do next. You hand `ReActAgent` a client, a set of tools, and a system prompt. It calls the model, runs any tool calls the model asks for, feeds the results back, and loops until the model returns a final answer.
+    For exploratory, open-ended problems. The model decides what to do next. You hand `ReActAgent` a client, a set of tools, and a system prompt. It calls the model, runs any tool calls the model asks for, feeds the results back, and loops until the model returns a final answer.
   </Card>
-  <Card title="@agent_task: the workflow graph" icon="diagram-project" href="/concepts/runtime">
-    You decide what to do next. Decorate plain Python functions with `@agent_task`, call them, and Motus turns the data flow between them into a parallel task graph. No DAG wiring, no YAML.
+  <Card title="Workflow: the task graph" icon="diagram-project" href="/concepts/runtime">
+    For stable control over a known-good procedure. You decide what to do next. Decorate plain Python functions with `@agent_task`, call them, and Motus turns the data flow between them into a parallel task graph. No DAG wiring, no YAML.
   </Card>
 </CardGroup>
 
@@ -34,7 +32,7 @@ agent = ReActAgent(
 answer = await agent("What's the weather in Tokyo?")
 ```
 
-```python @agent_task
+```python Workflow
 from motus.runtime import agent_task, resolve
 
 @agent_task
@@ -49,18 +47,18 @@ result = resolve(summarize(pages))     # runs once every fetch is done
 
 ### When to reach for which
 
-`ReActAgent` is the right default for chat assistants, research agents, coding agents, and anything else where you want the model doing the planning. You get the reasoning loop, tool dispatch, memory, guardrails, and tracing for free.
+Reach for `ReActAgent` when the problem is open-ended and you want the agent to discover the right steps on its own. Research, debugging, triage, coding agents, customer support, anything where you cannot write down the plan in advance. You give it tools and let the model explore.
 
-`@agent_task` is the right default for pipelines you already know the shape of: parallel scrapers, multi-stage extractors, fan-out fan-in over a list of inputs, batch jobs that call an LLM many times. You get parallelism, retries, and timeouts on every step without wiring up a scheduler yourself.
+Reach for `Workflow` when the procedure is already a solved problem and you want stable, repeatable control over it. ETL pipelines, evaluation harnesses, content processing, batch LLM jobs, anything where the steps are well understood and you mostly want parallelism, retries, and observability around them.
 
-Most non-trivial projects use both. A workflow task can call a `ReActAgent`. One agent can be exposed as a tool to another agent via `as_tool()`. Under the hood both styles share the same runtime, so tracing, retries, cancellation, and error propagation all behave the same way no matter which style you choose.
+The two compose. A workflow step can call a `ReActAgent` when part of an otherwise stable pipeline needs exploration. An agent can delegate to another agent via `as_tool()` when one exploratory loop should hand off to a more specialized one.
 
 ## The layers
 
 ```mermaid
 flowchart TD
     Serve["Serving layer<br/>(motus serve, motus deploy, Motus Cloud)"]
-    Code["Your code<br/>(ReActAgent and/or @agent_task)"]
+    Code["Your code<br/>(ReActAgent and/or Workflow)"]
     Runtime["Runtime<br/>(GraphScheduler + AgentFuture)"]
     Models["Model clients"]
     Tools["Tools"]
@@ -78,9 +76,9 @@ flowchart TD
 From the top down:
 
 1. **Serving** wraps any agent behind a session-based HTTP API. `motus serve` runs it locally, `motus deploy` ships the same code to Motus Cloud, and the REST surface is identical on both. A session is one persistent conversation between a user and an agent.
-2. **Your code** sits under the serving layer. It is a `ReActAgent`, a set of `@agent_task` functions, or both.
-3. **The runtime** is where everything actually executes. Every model call, every tool call, and every `@agent_task` invocation becomes a node in a task graph. A scheduler (`GraphScheduler`) runs the graph, and each node returns an `AgentFuture` that tracks its result and any downstream dependencies.
-4. **Models, tools, and memory** are pluggable services your code reaches for. The runtime invokes them as tasks, so retries, timeouts, and tracing apply uniformly.
+2. **Your code** sits under the serving layer. It is a `ReActAgent`, a Workflow built out of `@agent_task` functions, or both.
+3. **The runtime** is where everything actually executes. Every model call, every tool call, and every workflow step becomes a node in a task graph. A scheduler (`GraphScheduler`) runs the graph, and each node returns an `AgentFuture` that tracks its result and any downstream dependencies.
+4. **Model calls and tool calls** go through the runtime as tasks, which is how retries, timeouts, and tracing apply to them uniformly. **Memory** is not a task: it is session state the agent reads and writes directly around each turn.
 5. **Tracing** watches the runtime through lifecycle hooks. It records spans for every task without you instrumenting anything by hand.
 
 ## Module map
@@ -102,35 +100,11 @@ Jump straight to the page you need.
 
 For the serving and deployment side, see [Serving](/guides/serving), [Deployment](/guides/deployment), and [Tracing](/guides/tracing).
 
-## Life of a task
-
-An agent turn and a workflow step both land on the runtime the same way. Here is the agent turn, since it is the richer case.
-
-<Steps>
-  <Step title="The message reaches the agent">
-    The server appends the user message to the session's memory and hands control to the agent.
-  </Step>
-  <Step title="The agent calls the model">
-    `ReActAgent` submits a model call as an `@agent_task`. The scheduler runs it, the model client hits the provider, and the result comes back as an `AgentFuture`.
-  </Step>
-  <Step title="Tools run in parallel when possible">
-    If the model returns tool calls, each one becomes another `@agent_task`. Independent tool calls are submitted together so the runtime can run them concurrently, and the agent then awaits their futures.
-  </Step>
-  <Step title="The loop repeats">
-    Tool results feed into the next model call. This continues until the model returns a final answer. If the agent hits `max_steps` first it raises `RuntimeError` instead, and if `timeout` is set it stops gracefully after the current step.
-  </Step>
-  <Step title="Memory and tracing settle">
-    The final answer goes back through the server, memory records the turn, and `TraceManager` has already captured spans for every model and tool call along the way.
-  </Step>
-</Steps>
-
-A workflow step takes the same path with the reasoning loop removed. You submit tasks, the scheduler runs them as their dependencies resolve, and you call `resolve()` (or `await` inside another task) to get the final value. Every step is traced and retried under the same rules.
-
 ## Where to go next
 
 Pick a starting point based on what you want to build.
 
-- **A single LLM driven assistant.** Start with [Agents](/concepts/agents), then [Tools](/concepts/tools), then [Memory](/concepts/memory).
+- **A single LLM-driven assistant.** Start with [Agents](/concepts/agents), then [Tools](/concepts/tools), then [Memory](/concepts/memory).
 - **A parallel pipeline or batch job.** Start with [Runtime](/concepts/runtime). Circle back to [Agents](/concepts/agents) if any step needs an LLM.
 - **A team of agents.** See [Multi-agent](/guides/multi-agent) for how `as_tool()` turns one agent into a tool for another.
 - **An agent that needs external tools.** See [MCP Integration](/guides/mcp-integration) to plug in any MCP server.
