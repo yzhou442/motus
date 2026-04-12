@@ -1,6 +1,6 @@
 ---
 title: "Workflow"
-description: "Turn Python functions into a parallel task graph with @agent_task and AgentFuture."
+description: "Turn Python functions into a parallel task graph with `@agent_task` and `AgentFuture`."
 ---
 
 A Workflow is a graph of `@agent_task`-decorated Python functions. You write ordinary Python; Motus infers the data-flow dependencies between your functions and runs the graph in parallel underneath. No DAG definitions, no edge declarations, no YAML.
@@ -12,7 +12,7 @@ Both programming models run on the same scheduler. A `ReActAgent`'s model calls 
 ## Basic example
 
 ```python
-from motus.runtime import agent_task, resolve, shutdown
+from motus.runtime import agent_task, resolve
 
 
 @agent_task
@@ -28,8 +28,6 @@ def multiply(x, y):
 a = add(3, 4)        # returns AgentFuture, not 7
 b = multiply(a, 10)  # depends on a, runs after a completes
 print(resolve(b))    # 70
-
-shutdown()
 ```
 
 When you call `add(3, 4)`, the runtime registers a task and hands you back an `AgentFuture`, not a concrete value. When you pass that future into `multiply(a, 10)`, the runtime sees the dependency and schedules `multiply` to run after `a` resolves. You write straight-line Python; Motus figures out what can run in parallel and what has to wait.
@@ -61,64 +59,8 @@ async def fetch_and_process(url):
 ```
 
 <Note>
-  The blocking public API is `resolve()` and `AgentFuture.af_result()`. There is no `.result()` method. Inside an `@agent_task`, prefer `await`: calling `resolve()` from the runtime's own event loop raises `RuntimeError` to protect you from a deadlock.
+  Inside an `@agent_task`, always use `await` rather than `resolve()`. Calling `resolve()` from the runtime's own event loop raises `RuntimeError` to protect you from a deadlock.
 </Note>
-
-## Building the graph without blocking
-
-Most Python operators on an `AgentFuture` return a new future that extends the graph, so you can keep composing without pulling values out.
-
-```python
-x = add(10, 5)
-total = x + 100            # AgentFuture, not blocking
-doubled = x * 2            # AgentFuture, another graph node
-
-data = make_data()
-first = data["scores"][0]  # chained getitem, two new futures
-top_score = data.scores    # attribute access is deferred too
-
-get_scorer = find_scorer()
-score = get_scorer(team, year)  # calling a future is deferred too
-```
-
-`total = x + 100` does not wait for `x` to resolve. It creates a node that executes when `x` is ready. Arithmetic, `__getitem__`, `__getattr__`, `__call__`, and ordering comparisons (`>`, `<`, `>=`, `<=`) all return futures.
-
-Some operators force a blocking wait to return a concrete value. See [Sync barriers](#sync-barriers) below.
-
-## Sync barriers
-
-A handful of Python operators have to return a concrete value rather than another future. On an `AgentFuture` these trigger a blocking wait to resolve the underlying value.
-
-<Warning>
-  The most common trap is putting futures in a `set()` or using them as dict keys, which fires `__hash__`:
-
-  ```python
-  # WRONG: hashing futures is a sync barrier
-  futures = {add(1, 2), add(3, 4)}
-
-  # CORRECT: key by object identity
-  by_id: dict[int, AgentFuture] = {}
-  f = add(1, 2)
-  by_id[id(f)] = f
-  ```
-
-  Inside an `@agent_task`, a sync barrier on the runtime's own event loop raises `RuntimeError` instead of deadlocking. If you need to deduplicate or index futures, key by `id(future)` or an integer you control.
-</Warning>
-
-Here is the full list of operators that force a resolution:
-
-| Operator | Triggered by |
-|---|---|
-| `__bool__` | `if future:`, `bool(future)`, `not future` |
-| `__str__` | `str(future)`, `f"{future}"` |
-| `__len__` | `len(future)` |
-| `__iter__` | `for x in future:`, unpacking `a, b = future` |
-| `__int__` / `__float__` | `int(future)`, `float(future)` |
-| `__eq__` / `__ne__` | `future == x`, `future != x` |
-| `__hash__` | putting a future in `set()` or as a `dict` key |
-| `__contains__` | `x in future` |
-
-Motus warns every time a sync barrier fires so you can catch accidents. Set `MOTUS_QUIET_SYNC=1` to silence the warnings once you have audited your code.
 
 ## Retries and timeouts
 
@@ -246,15 +188,73 @@ Cancellation is thread-safe and can be called from any thread, including from in
 
 ## Lifecycle
 
+You rarely need to manage the runtime yourself. It auto-initializes on the first `@agent_task` call and cleans up at interpreter exit. The following entry points exist for the cases where you need them:
+
 ```python
 from motus.runtime import init, shutdown, is_initialized
 
-init()         # optional: starts the runtime thread and event loop
-# ... run tasks ...
-shutdown()     # cancels in-flight tasks and stops the event loop
+init()             # optional; pre-start the runtime thread and event loop
+shutdown()         # force-stop: cancels in-flight tasks, poisons their futures
+is_initialized()   # True if the runtime is currently running
 ```
 
-If you skip `init()`, the runtime auto-initializes on the first `@agent_task` call. `shutdown()` stops the runtime: it signals the event loop to exit, cancels any in-flight tasks, and poisons their futures with `RuntimeError("Motus runtime is shutting down")`. Tasks do not drain; if you need them to finish, `resolve()` or `await` them first. `is_initialized()` tells you whether the runtime is currently running.
+`shutdown()` is a hard stop: it signals the event loop to exit, cancels any in-flight tasks, and poisons their futures with `RuntimeError("Motus runtime is shutting down")`. If you need tasks to finish, `resolve()` or `await` them before calling `shutdown()`.
+
+## Building the graph without blocking
+
+Most Python operators on an `AgentFuture` return a new future that extends the graph, so you can keep composing without pulling values out.
+
+```python
+x = add(10, 5)
+total = x + 100            # AgentFuture, not blocking
+doubled = x * 2            # AgentFuture, another graph node
+
+data = make_data()
+first = data["scores"][0]  # chained getitem, two new futures
+top_score = data.scores    # attribute access is deferred too
+
+get_scorer = find_scorer()
+score = get_scorer(team, year)  # calling a future is deferred too
+```
+
+`total = x + 100` does not wait for `x` to resolve. It creates a node that executes when `x` is ready. Arithmetic, `__getitem__`, `__getattr__`, `__call__`, and ordering comparisons (`>`, `<`, `>=`, `<=`) all return futures.
+
+Some operators force a blocking wait to return a concrete value. See [Sync barriers](#sync-barriers) below.
+
+## Sync barriers
+
+A handful of Python operators have to return a concrete value rather than another future. On an `AgentFuture` these trigger a blocking wait to resolve the underlying value.
+
+<Warning>
+  The most common trap is putting futures in a `set()` or using them as dict keys, which fires `__hash__`:
+
+  ```python
+  # WRONG: hashing futures is a sync barrier
+  futures = {add(1, 2), add(3, 4)}
+
+  # CORRECT: key by object identity
+  by_id: dict[int, AgentFuture] = {}
+  f = add(1, 2)
+  by_id[id(f)] = f
+  ```
+
+  Inside an `@agent_task`, a sync barrier on the runtime's own event loop raises `RuntimeError` instead of deadlocking. If you need to deduplicate or index futures, key by `id(future)` or an integer you control.
+</Warning>
+
+Here is the full list of operators that force a resolution:
+
+| Operator | Triggered by |
+|---|---|
+| `__bool__` | `if future:`, `bool(future)`, `not future` |
+| `__str__` | `str(future)`, `f"{future}"` |
+| `__len__` | `len(future)` |
+| `__iter__` | `for x in future:`, unpacking `a, b = future` |
+| `__int__` / `__float__` | `int(future)`, `float(future)` |
+| `__eq__` / `__ne__` | `future == x`, `future != x` |
+| `__hash__` | putting a future in `set()` or as a `dict` key |
+| `__contains__` | `x in future` |
+
+Motus warns every time a sync barrier fires so you can catch accidents. Set `MOTUS_QUIET_SYNC=1` to silence the warnings once you have audited your code.
 
 ## How the runtime runs it
 
