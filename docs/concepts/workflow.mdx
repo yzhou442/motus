@@ -59,7 +59,7 @@ async def fetch_and_process(url):
 ```
 
 <Note>
-  Inside an `@agent_task`, always use `await` rather than `resolve()`. Calling `resolve()` from the runtime's own event loop raises `RuntimeError` to protect you from a deadlock.
+  Inside an async `@agent_task`, use `await` rather than `resolve()`. Async tasks run on the runtime's own event loop, and calling `resolve()` there raises `RuntimeError` to protect you from a deadlock. Sync `@agent_task`s run in the thread pool off the loop, so `resolve()` works fine inside them.
 </Note>
 
 ## Retries and timeouts
