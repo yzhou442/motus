@@ -423,6 +423,13 @@ ANTHROPIC_MODELS: Dict[str, ModelLimits] = {
         max_output_tokens=64_000,
         description="Claude Haiku 4.5 - fast and affordable",
     ),
+    "claude-haiku-4-5": ModelLimits(
+        model_id="claude-haiku-4-5",
+        provider=ModelProvider.ANTHROPIC,
+        context_window=200_000,
+        max_output_tokens=64_000,
+        description="Claude Haiku 4.5 - fast and affordable",
+    ),
     # Convenience aliases
     "claude-3-5-sonnet": ModelLimits(
         model_id="claude-3-5-sonnet",
