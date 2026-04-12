@@ -200,7 +200,6 @@ Learn more from our [comprehensive examples](examples/).
 
 ## Contributing
 
-**Open source from Day 1.** We believe the infrastructure for agentic inference should be open.
 See the **[Contributing Guide](docs/contributing/development-setup.md)** to get started, or come say hi on [Slack](https://join.slack.com/t/lithosaicommunity/shared_invite/zt-3uf2cykza-P9VETbJAUx7WKjwxMk~06Q). Let's build together!
 
 ## License
