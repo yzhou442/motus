@@ -19,6 +19,7 @@ from .base import (
     ToolDefinition,
 )
 
+
 class AnthropicChatClient(BaseChatClient):
     """
     Anthropic implementation of BaseChatClient.
