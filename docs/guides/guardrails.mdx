@@ -3,7 +3,7 @@ title: "Guardrails"
 description: "Validate, transform, or block the inputs and outputs of agents and tools with plain Python functions."
 ---
 
-A guardrail is just a Python function you hand to an agent or a tool. There is no base class, no registration DSL. Motus calls it with the relevant value and interprets what the function returns.
+A guardrail is just a Python function you hand to an agent or a tool. Motus calls it with the relevant value and interprets what the function returns.
 
 Every guardrail has the same three-outcome rule:
 
@@ -99,7 +99,7 @@ safe_query = tool(execute_sql, output_guardrails=[redact_passwords])
 ```
 
 <Note>
-  When a tool guardrail raises, Motus catches the exception and returns the message to the model as a `{"error": ...}` tool result. The agent keeps running and the model can adjust, so you do not need to wrap tool calls in `try`/`except`.
+  When a tool guardrail raises, Motus catches the exception and returns the message to the model as a `{"error": ...}` tool result. The model sees the failure the same way it would see any other tool error, reads your exception message as feedback, and can reconsider what to try next. This is how an agent naturally learns to avoid a blocked action and route around it.
 </Note>
 
 ### Multiple guardrails chain sequentially
