@@ -25,6 +25,13 @@ logger = logging.getLogger("motus.serve.worker")
 
 DEFAULT_MAX_WORKERS = 4
 
+# user_params keys that are promoted to worker env vars and stripped
+# before the message reaches the agent.
+_USER_PARAMS_TO_ENV: dict[str, str] = {
+    "sandbox_url": "SANDBOX_URL",
+    "sandbox_token": "SANDBOX_TOKEN",
+}
+
 
 @dataclass
 class WorkerResult:
@@ -153,6 +160,18 @@ def _worker_entry(conn, import_path, message, state, session_id=None):
     # Set session_id before any motus import triggers runtime init
     if session_id:
         os.environ["MOTUS_SESSION_ID"] = session_id
+
+    # Promote designated user_params to env vars and strip them from the
+    # message so the agent never sees infrastructure-level credentials.
+    if message.user_params:
+        for param_key, env_name in _USER_PARAMS_TO_ENV.items():
+            value = message.user_params.get(param_key)
+            if value is not None:
+                os.environ[env_name] = str(value)
+        remaining = {
+            k: v for k, v in message.user_params.items() if k not in _USER_PARAMS_TO_ENV
+        }
+        message.user_params = remaining or None
 
     cwd = os.getcwd()
     if cwd not in sys.path:
