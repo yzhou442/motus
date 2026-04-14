@@ -56,6 +56,7 @@
               "concepts/workflow",
               "concepts/models",
               "concepts/memory",
+              "concepts/sandbox",
               "guides/guardrails",
               "guides/human-in-the-loop",
               "guides/multi-agent",
