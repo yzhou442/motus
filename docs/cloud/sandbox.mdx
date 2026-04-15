@@ -19,8 +19,8 @@ The cloud hierarchy on [Motus Cloud](/cloud/overview) is `Project → Session �
 
 ```
 Session
-├── Sandbox (one, serves every turn in the session)
-└── Trace (one per agent run, runs tool calls in the sandbox)
+├── Sandbox (one, serves every request in the session)
+└── Traces (one per request, runs tool calls in the sandbox)
 ```
 
 When a session is created, the platform records a sandbox for it but does not boot the container yet. The first time your agent actually runs something, the platform starts the container. Every later turn in the same session reuses it. When the session is deleted, the sandbox is deleted with it.
